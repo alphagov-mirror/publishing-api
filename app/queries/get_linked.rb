@@ -67,7 +67,7 @@ module Queries
     end
 
     def permitted_fields
-      Edition.column_names + %w(content_id base_path locale publication_state)
+      Edition.column_names + %w(content_id base_path locale publication_state links)
     end
 
     def presenter

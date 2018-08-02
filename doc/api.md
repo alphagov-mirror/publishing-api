@@ -552,7 +552,7 @@ for some `link_type`.
   - The type of link between the documents.
 - `fields[]` *(required)*
   - Accepts an array of: analytics_identifier, base_path,
-    content_store, description, details, document_type,
+    content_store, description, details, document_type, links,
     first_published_at, last_edited_at, phase, public_updated_at,
     publishing_app, redirects, rendering_app, routes, schema_name,
     state, title, user_facing_version, update_type, state
