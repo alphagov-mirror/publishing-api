@@ -29,11 +29,11 @@ module Presenters
     end
 
     def for_content_store(payload_version)
-      present.except(:update_type).merge(payload_version: payload_version)
+      present.except(:update_type, :auth_bypass_ids).merge(payload_version: payload_version)
     end
 
     def for_message_queue(payload_version)
-      present.merge(
+      present.except(:auth_bypass_ids).merge(
         govuk_request_id: GdsApi::GovukHeaders.headers[:govuk_request_id],
         links: unexpanded_links,
         payload_version: payload_version,
