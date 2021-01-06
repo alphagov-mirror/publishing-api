@@ -16,7 +16,7 @@ module Commands
 
         update_content_dependencies(edition)
 
-        orphaned_links = link_diff_between(
+        orphaned_content_ids = link_diff_between(
           @links_before_update,
           edition.links.map(&:target_content_id),
         )
@@ -25,7 +25,7 @@ module Commands
           send_downstream(
             document.content_id,
             document.locale,
-            orphaned_links,
+            orphaned_content_ids,
           )
         end
 
@@ -208,7 +208,11 @@ module Commands
         @edition_diff ||= LinkExpansion::EditionDiff.new(@edition, previous_edition: @previous_edition)
       end
 
-      def send_downstream(content_id, locale, orphaned_links)
+      def orphaned_content_ids_for_locale(orphaned_content_ids, locale)
+        Document.where(content_id: orphaned_content_ids, locale: locale).pluck(:content_id)
+      end
+
+      def send_downstream(content_id, locale, orphaned_content_ids)
         return unless downstream
 
         queue = bulk_publishing? ? DownstreamDraftWorker::LOW_QUEUE : DownstreamDraftWorker::HIGH_QUEUE
@@ -218,7 +222,7 @@ module Commands
           content_id: content_id,
           locale: locale,
           update_dependencies: edition_diff.present?,
-          orphaned_content_ids: orphaned_links,
+          orphaned_content_ids: orphaned_content_ids_for_locale(orphaned_content_ids, locale),
           source_command: "put_content",
           source_fields: edition_diff.has_previous_edition? ? edition_diff.fields : [],
         )
