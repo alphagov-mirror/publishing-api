@@ -417,26 +417,34 @@ RSpec.describe Commands::V2::PatchLinkSet do
   end
 
   context "when 'links' are replaced in the payload" do
-    let(:link_a) { SecureRandom.uuid }
-    let(:link_b) { SecureRandom.uuid }
-    let(:edition) { create(:live_edition) }
-    let(:content_id) { edition.document.content_id }
-
+    let(:link_a) { create(:live_edition) }
     let(:payload) do
-      { content_id: content_id, links: { topics: [link_b] } }
+      link_b = create(:live_edition)
+      { content_id: content_id, links: { topics: [link_b.content_id] } }
     end
 
     before do
-      create(
-        :link_set,
-        content_id: content_id,
-        links_hash: { topics: [link_a] },
-      )
+      create(:link_set,
+             content_id: content_id,
+             links_hash: { topics: [link_a.content_id] })
     end
 
-    it "sends link_a downstream as an orphaned content_id when replaced by link_b" do
+    it "sends replaced link downstream as an orphaned content_id" do
+      create(:live_edition,
+             document: create(:document, content_id: content_id))
+
       expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
-        .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a]))
+        .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a.content_id]))
+
+      described_class.call(payload)
+    end
+
+    it "doesn't send replaced link downstream live if the locale doesn't exist for it" do
+      create(:live_edition,
+             document: create(:document, content_id: content_id, locale: "fr"))
+
+      expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
+        .with("downstream_high", hash_excluding(orphaned_content_ids: [link_a.content_id]))
 
       described_class.call(payload)
     end

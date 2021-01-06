@@ -79,13 +79,23 @@ module Commands
 
         draft_locales = Queries::LocalesForEditions.call([content_id], %w[draft live])
         draft_locales.each do |(content_id, locale)|
-          downstream_draft(content_id, locale, orphaned_content_ids, update_dependencies)
+          downstream_draft(content_id,
+                           locale,
+                           orphaned_content_ids,
+                           update_dependencies)
         end
 
         live_locales = Queries::LocalesForEditions.call([content_id], %w[live])
         live_locales.each do |(content_id, locale)|
-          downstream_live(content_id, locale, orphaned_content_ids, update_dependencies)
+          downstream_live(content_id,
+                          locale,
+                          orphaned_content_ids,
+                          update_dependencies)
         end
+      end
+
+      def orphaned_content_ids_for_locale(orphaned_content_ids, locale)
+        Document.where(content_id: orphaned_content_ids, locale: locale).pluck(:content_id)
       end
 
       def bulk_publishing?
@@ -98,7 +108,7 @@ module Commands
           queue,
           content_id: content_id,
           locale: locale,
-          orphaned_content_ids: orphaned_content_ids,
+          orphaned_content_ids: orphaned_content_ids_for_locale(orphaned_content_ids, locale),
           update_dependencies: update_dependencies,
           source_command: "patch_link_set",
         )
@@ -111,7 +121,7 @@ module Commands
           content_id: content_id,
           locale: locale,
           message_queue_event_type: "links",
-          orphaned_content_ids: orphaned_content_ids,
+          orphaned_content_ids: orphaned_content_ids_for_locale(orphaned_content_ids, locale),
           update_dependencies: update_dependencies,
           source_command: "patch_link_set",
         )
