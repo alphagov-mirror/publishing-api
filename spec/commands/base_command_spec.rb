@@ -24,7 +24,6 @@ RSpec.describe Commands::BaseCommand do
 
   class Commands::SlowCommand < Commands::BaseCommand
     def call
-      Timecop.travel Time.zone.now + 1
       :foo
     end
   end
@@ -52,9 +51,15 @@ RSpec.describe Commands::BaseCommand do
 
   describe "timing" do
     it "sends a command's duration to statsd" do
+      stub_const("Process::CLOCK_MONOTONIC", 6)
+      allow(Process).to receive(:clock_gettime)
+      allow(Process).to receive(:clock_gettime)
+        .with(Process::CLOCK_MONOTONIC, :nanosecond)
+        .and_return(1_472_243_573_027_000, 1_472_246_723_347_000)
+
       expect(PublishingAPI.service(:statsd)).to receive(:timing) do |name, time, sample_rate|
         expect(name).to eq "Commands.SlowCommand"
-        expect(time).to be_within(10).of(1000)
+        expect(time).to eq(3150)
         expect(sample_rate).to eq 1
       end
 
