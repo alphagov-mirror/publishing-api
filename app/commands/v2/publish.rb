@@ -30,12 +30,14 @@ module Commands
         create_change_note if payload[:update_type].present?
       end
 
-      def orphaned_content_ids
+      def orphaned_content_ids_for_locale
         return [] unless previous_edition
 
         previous_links = previous_edition.links.map(&:target_content_id)
         current_links = edition.links.map(&:target_content_id)
-        previous_links - current_links
+        orphaned_content_ids = previous_links - current_links
+
+        Document.where(content_id: orphaned_content_ids, locale: locale).pluck(:content_id)
       end
 
       def create_publish_action
@@ -243,7 +245,7 @@ module Commands
       def live_worker_params
         worker_params.merge(
           message_queue_event_type: update_type,
-          orphaned_content_ids: orphaned_content_ids,
+          orphaned_content_ids: orphaned_content_ids_for_locale,
         )
       end
 

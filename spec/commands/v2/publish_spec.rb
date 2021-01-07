@@ -524,31 +524,41 @@ RSpec.describe Commands::V2::Publish do
     end
 
     context "when links differ from the previously published edition" do
-      let(:link_a) { SecureRandom.uuid }
-      let(:link_b) { SecureRandom.uuid }
+      let(:link_a) { create(:edition) }
 
       let!(:live_item) do
         create(
           :live_edition,
           document: document,
-          links_hash: { topics: [link_a] },
+          links_hash: { topics: [link_a.content_id] },
         )
       end
-
       let!(:draft_item) do
+        link_b = create(:edition)
         create(
           :draft_edition,
           document: document,
-          links_hash: { topics: [link_b] },
+          links_hash: { topics: [link_b.content_id] },
           user_facing_version: 2,
         )
       end
 
-      it "sends link_a downstream as an orphaned content_id when draft item is published" do
+      it "sends replaced link downstream as an orphaned content_id when draft item is published" do
         expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
-          .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a]))
+          .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a.content_id]))
 
-        described_class.call(payload)
+        described_class.call(payload.merge({ content_id: document.content_id }))
+      end
+
+      context "with different locales" do
+        let(:document) { create(:document, locale: "fr", stale_lock_version: 2) }
+
+        it "doesn't send replaced link downstream live if the locale doesn't exist for it" do
+          expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
+            .with("downstream_high", hash_excluding(orphaned_content_ids: [link_a.content_id]))
+
+          described_class.call(payload.merge({ content_id: document.content_id, locale: "fr" }))
+        end
       end
     end
 
