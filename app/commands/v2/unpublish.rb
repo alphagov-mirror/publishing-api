@@ -133,7 +133,7 @@ module Commands
           content_id: document.content_id,
           locale: document.locale,
           update_dependencies: true,
-          orphaned_content_ids: orphaned_content_ids,
+          orphaned_content_ids: orphaned_content_ids_for_locale(document.locale),
           message_queue_event_type: "unpublish",
           source_command: "unpublish",
         )
@@ -143,12 +143,14 @@ module Commands
         payload[:previous_version].to_i if payload[:previous_version]
       end
 
-      def orphaned_content_ids
+      def orphaned_content_ids_for_locale(locale)
         return [] if !payload[:allow_draft] || !previous
 
         previous_links = previous.links.map(&:target_content_id)
         current_links = find_unpublishable_edition.links.map(&:target_content_id)
-        previous_links - current_links
+        orphaned_content_ids = previous_links - current_links
+
+        Document.where(content_id: orphaned_content_ids, locale: locale).pluck(:content_id)
       end
 
       def find_unpublishable_edition

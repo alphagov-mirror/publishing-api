@@ -397,37 +397,44 @@ RSpec.describe Commands::V2::Unpublish do
     end
 
     context "when there is a draft and published with differing links" do
-      let(:link_a) { SecureRandom.uuid }
-      let(:link_b) { SecureRandom.uuid }
-      let!(:draft_edition) do
-        create(
-          :draft_edition,
-          document: document,
-          user_facing_version: 2,
-          links_hash: { topics: [link_b] },
-        )
+      let(:link_a) { create(:edition) }
+
+      before do
+        link_b = create(:edition)
+        create(:live_edition,
+               document: document,
+               links_hash: { topics: [link_a.content_id] })
+        create(:draft_edition,
+               document: document,
+               user_facing_version: 2,
+               links_hash: { topics: [link_b.content_id] })
       end
 
-      let!(:live_edition) do
-        create(
-          :live_edition,
-          document: document,
-          links_hash: { topics: [link_a] },
-        )
-      end
+      it "sends replaced link downstream live as an orphaned content_id" do
+        expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
+          .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a.content_id]))
 
-      after do
         described_class.call(payload.merge(allow_draft: true))
       end
 
-      it "includes orphaned content ids downstream live" do
-        expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
-          .with("downstream_high", a_hash_including(orphaned_content_ids: [link_a]))
-      end
-
-      it "excludes orphaned content ids downstream draft as they were handled in put content" do
+      it "doesn't send replaced link downstream draft as they were handled in put content" do
         expect(DownstreamDraftWorker).to receive(:perform_async_in_queue)
           .with("downstream_high", hash_excluding(:orphaned_content_ids))
+
+        described_class.call(payload.merge(allow_draft: true))
+      end
+
+      context "with different locales" do
+        let(:document) { create(:document, locale: "fr") }
+
+        it "doesn't send replaced link downstream live if the locale doesn't exist for it" do
+          expect(DownstreamLiveWorker).to receive(:perform_async_in_queue)
+            .with("downstream_high", hash_excluding(orphaned_content_ids: [link_a.content_id]))
+
+          described_class.call(
+            payload.merge(allow_draft: true, content_id: document.content_id, locale: "fr"),
+          )
+        end
       end
     end
 
